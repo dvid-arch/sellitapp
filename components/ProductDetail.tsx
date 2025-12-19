@@ -4,7 +4,7 @@ import {
   X, MapPin, ChevronLeft, ChevronRight, MessageSquare, 
   CheckCircle2, Tag, ArrowRight, Loader2, Clock, 
   AlertCircle, Edit3, Trash2, Check, BarChart3,
-  TrendingUp, Heart, Flame, ShieldCheck, ShoppingBag
+  TrendingUp, Heart, Flame, ShoppingBag, Eye, ExternalLink
 } from 'lucide-react';
 import { Listing, Offer, Chat } from '../types';
 import { useToast } from '../context/ToastContext';
@@ -23,6 +23,8 @@ interface ProductDetailProps {
   onWithdrawOffer?: (offerId: string) => void;
   onToggleSave?: (id: string) => void;
   onMarkSold?: (id: string) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 export const ProductDetail: React.FC<ProductDetailProps> = ({ 
@@ -38,7 +40,9 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
   onMakeOffer,
   onWithdrawOffer,
   onToggleSave,
-  onMarkSold
+  onMarkSold,
+  onEdit,
+  onDelete
 }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -115,8 +119,8 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
     if (isOwner) {
       return (
         <div className="bg-sellit text-white px-8 py-3 flex items-center gap-3 animate-in slide-in-from-top duration-500">
-          <ShieldCheck size={18} />
-          <span className="text-xs font-black uppercase tracking-wider">You are viewing your own listing</span>
+          <BarChart3 size={18} />
+          <span className="text-xs font-black uppercase tracking-wider">Item Insights & Control Center</span>
         </div>
       );
     }
@@ -156,43 +160,83 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
     if (isOwner) {
       return (
         <div className="space-y-6">
+          {/* Performance Section */}
+          <div className="bg-sellit/5 rounded-[2.5rem] p-8 border border-sellit/10">
+             <div className="flex items-center justify-between mb-6">
+               <h3 className="text-[10px] font-black text-sellit uppercase tracking-widest flex items-center gap-2">
+                 <Eye size={14} /> Engagement Metrics
+               </h3>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+               <div className="bg-white p-5 rounded-3xl shadow-sm border border-sellit/5">
+                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Live Views</p>
+                 <div className="flex items-baseline gap-1.5">
+                   <p className="text-3xl font-black text-gray-900">{listing.viewCount || 0}</p>
+                   <span className="text-[10px] text-green-500 font-bold">+12%</span>
+                 </div>
+               </div>
+               <div className="bg-white p-5 rounded-3xl shadow-sm border border-sellit/5">
+                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Offers</p>
+                 <div className="flex items-baseline gap-1.5">
+                   <p className="text-3xl font-black text-gray-900">{receivedOffers.length}</p>
+                   <span className="text-[10px] text-orange-500 font-bold">Active</span>
+                 </div>
+               </div>
+             </div>
+          </div>
+
           <div className="bg-gray-50 rounded-[2.5rem] p-8 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
-               <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Offers Received</h3>
-               <span className="bg-sellit/10 text-sellit px-3 py-1 rounded-full text-[10px] font-black">{receivedOffers.length} TOTAL</span>
+               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Offers Management</h3>
+               {receivedOffers.length > 0 && <span className="text-[10px] font-bold text-sellit">Action Required</span>}
             </div>
             
             <div className="space-y-4 max-h-64 overflow-y-auto scrollbar-hide">
               {receivedOffers.length > 0 ? (
                 receivedOffers.map(offer => (
-                  <div key={offer.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between group hover:border-sellit/30 transition-all">
+                  <div key={offer.id} className="bg-white p-5 rounded-2xl border border-gray-100 flex items-center justify-between group hover:border-sellit/30 transition-all shadow-sm">
                     <div className="flex items-center gap-3">
-                      <img src={offer.buyerAvatar} className="w-10 h-10 rounded-full object-cover" />
+                      <div className="relative">
+                        <img src={offer.buyerAvatar} className="w-12 h-12 rounded-full object-cover border border-gray-100" />
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
+                      </div>
                       <div>
                         <p className="font-bold text-gray-900 text-sm">{offer.buyerName}</p>
-                        <p className="text-[10px] font-black text-sellit">₦{offer.offeredPrice.toLocaleString()}</p>
+                        <p className="text-sm font-black text-sellit">₦{offer.offeredPrice.toLocaleString()}</p>
                       </div>
                     </div>
-                    <button className="p-2 text-gray-400 hover:text-sellit"><MessageSquare size={18} /></button>
+                    <div className="flex gap-2">
+                       <button className="p-2.5 bg-sellit/5 text-sellit rounded-xl hover:bg-sellit hover:text-white transition-all">
+                         <MessageSquare size={18} />
+                       </button>
+                    </div>
                   </div>
                 ))
               ) : (
-                <p className="text-center py-8 text-xs font-bold text-gray-300">No offers yet. Be patient!</p>
+                <div className="text-center py-10">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-100 mx-auto mb-4 border border-dashed border-gray-200">
+                    <Tag size={24} />
+                  </div>
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No offers received yet</p>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex-1 bg-white border-2 border-gray-100 text-gray-900 py-4.5 rounded-[1.5rem] font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition-all">
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <button onClick={onEdit} className="flex-1 bg-white border-2 border-gray-100 text-gray-900 py-4.5 rounded-[1.5rem] font-bold flex items-center justify-center gap-2 hover:bg-gray-50 transition-all active:scale-95 shadow-sm">
               <Edit3 size={18} /> Edit Ad
             </button>
             <button 
               onClick={() => onMarkSold?.(listing.id)}
-              className="flex-1 bg-gray-900 text-white py-4.5 rounded-[1.5rem] font-bold shadow-xl shadow-gray-200 flex items-center justify-center gap-2 hover:bg-black transition-all"
+              className="flex-1 bg-gray-900 text-white py-4.5 rounded-[1.5rem] font-bold shadow-xl shadow-gray-200 flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-95"
             >
               <CheckCircle2 size={18} /> Mark Sold
             </button>
           </div>
+          <button onClick={onDelete} className="w-full text-red-400 hover:text-red-500 py-3 font-black text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2">
+            <Trash2 size={14} /> Remove Listing Forever
+          </button>
         </div>
       );
     }
@@ -220,7 +264,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               </button>
             </div>
           </div>
-          <button onClick={onContact} className="w-full bg-sellit text-white py-5 rounded-[1.5rem] font-bold text-lg flex items-center justify-center gap-3 shadow-xl shadow-sellit/20">
+          <button onClick={onContact} className="w-full bg-sellit text-white py-5 rounded-[1.5rem] font-bold text-lg flex items-center justify-center gap-3 shadow-xl shadow-sellit/20 active:scale-95 transition-all">
             <MessageSquare size={22} />
             <span>{existingChat ? 'Resume Conversation' : 'Message Seller'}</span>
           </button>
@@ -252,7 +296,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
 
         <div className="flex items-center justify-between px-6 py-4 md:px-8 md:py-6 border-b border-gray-50 shrink-0">
           <div className="flex items-center gap-3">
-             <h2 className="text-xl md:text-2xl font-black text-gray-900">Details</h2>
+             <h2 className="text-xl md:text-2xl font-black text-gray-900">{isOwner ? 'Management' : 'Product Details'}</h2>
           </div>
           <div className="flex items-center gap-2">
             {!isOwner && (
@@ -271,7 +315,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
 
         <div className="flex-1 overflow-y-auto scrollbar-hide pb-24 md:pb-8">
           <div className="p-4 md:p-8">
-            <div className="relative aspect-square md:aspect-[4/3] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden mb-6 md:mb-8 group bg-gray-50">
+            <div className="relative aspect-square md:aspect-[4/3] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden mb-6 md:mb-8 group bg-gray-50 shadow-inner">
               <div ref={scrollRef} onScroll={handleScroll} className="flex h-full w-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
                 {productImages.map((img, i) => (
                   <div key={i} className="min-w-full h-full snap-center">
@@ -290,7 +334,10 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
 
             <div className="space-y-6 md:space-y-8">
               <div>
-                <h1 className="text-2xl md:text-3xl font-black text-gray-900 mb-1 leading-tight">{listing.title}</h1>
+                <div className="flex items-center justify-between gap-4 mb-2">
+                   <h1 className="text-2xl md:text-3xl font-black text-gray-900 leading-tight truncate">{listing.title}</h1>
+                   {!isOwner && <span className="text-[10px] font-black text-sellit bg-sellit/5 px-2 py-1 rounded-lg border border-sellit/10">{listing.viewCount || 0} views</span>}
+                </div>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5 text-gray-400 font-bold text-xs">
                     <MapPin size={14} />
@@ -298,14 +345,14 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 text-gray-400 font-bold text-xs">
                     <Clock size={14} />
-                    <span>Listed 2h ago</span>
+                    <span>Listed recently</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between p-4 md:p-6 bg-gray-50 rounded-[1.5rem] md:rounded-[2rem]">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Price</span>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Price</span>
                   <div className="flex items-center gap-3">
                     <span className="text-2xl md:text-3xl font-black text-sellit">₦{listing.price.toLocaleString()}</span>
                     {priceDrop > 0 && (
@@ -321,20 +368,24 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               </div>
 
               <div>
-                <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-2">Description</h4>
+                <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  About Item
+                </h4>
                 <p className="text-gray-500 font-medium leading-relaxed text-sm md:text-base">{listing.description}</p>
               </div>
 
               {!isOwner && (
-                <div className="flex items-center justify-between p-4 md:p-6 border border-gray-100 rounded-3xl">
+                <div className="flex items-center justify-between p-4 md:p-6 border border-gray-100 rounded-3xl group cursor-pointer hover:bg-gray-50 transition-all">
                   <div className="flex items-center gap-3 md:gap-4">
-                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100" className="w-10 h-10 md:w-14 md:h-14 rounded-full object-cover" alt="" />
+                    <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100" className="w-10 h-10 md:w-14 md:h-14 rounded-full object-cover border border-gray-100" alt="" />
                     <div>
                       <span className="block font-bold text-gray-900 text-sm md:text-base">{listing.seller}</span>
-                      <span className="text-[10px] font-bold text-green-500 uppercase">Verified Student</span>
+                      <span className="text-[10px] font-bold text-green-500 uppercase flex items-center gap-1">
+                        Verified Student
+                      </span>
                     </div>
                   </div>
-                  <div className="p-2 md:p-3 bg-sellit/5 text-sellit rounded-2xl"><CheckCircle2 size={20} /></div>
+                  <div className="p-2 md:p-3 bg-sellit/5 text-sellit rounded-2xl group-hover:bg-sellit group-hover:text-white transition-all"><ExternalLink size={18} /></div>
                 </div>
               )}
 
@@ -362,7 +413,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               </div>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-black text-gray-700 ml-1">Your Price (₦)</label>
+                  <label className="text-[10px] font-black text-gray-700 ml-1 uppercase tracking-widest">Your Price (₦)</label>
                   <input type="text" placeholder="Enter your offer" className="w-full px-6 py-5 bg-white border-2 border-gray-100 rounded-2xl focus:border-sellit focus:ring-4 focus:ring-sellit/5 transition-all font-black text-2xl text-sellit" value={offerAmount} onChange={e => setOfferAmount(e.target.value)} autoFocus />
                 </div>
               </div>

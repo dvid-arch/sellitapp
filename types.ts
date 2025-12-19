@@ -23,6 +23,8 @@ export interface Listing {
   isUrgent?: boolean;
   isNegotiable?: boolean;
   status: ListingStatus;
+  viewCount?: number;
+  offerCount?: number;
 }
 
 export interface ViewRecord {

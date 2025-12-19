@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   Plus, Search, MapPin, Bell, MessageSquare, Home, 
   ChevronDown, Filter, PackageX, LogOut, PanelLeftClose, PanelLeftOpen,
-  ArrowUpDown, Radio, UserCircle, Settings, Heart
+  ArrowUpDown, Radio, UserCircle, Settings, Heart, TrendingUp, Sparkles, Tag,
+  ArrowRight
 } from 'lucide-react';
 import { Logo } from '../constants.tsx';
 import { User, Listing, Chat, Offer, ViewRecord } from '../types.ts';
@@ -14,6 +15,7 @@ import { BroadcastsView } from './BroadcastsView.tsx';
 import { ChatView } from './ChatView.tsx';
 import { NotificationsView } from './NotificationsView.tsx';
 import { ProfileView } from './ProfileView.tsx';
+import { useToast } from '../context/ToastContext.tsx';
 
 interface DashboardProps {
   user: User | null;
@@ -32,7 +34,9 @@ const MOCK_LISTINGS: Listing[] = [
     imageUrl: 'https://images.unsplash.com/photo-1571175452281-04a282879717?q=80&w=800&auto=format&fit=crop',
     seller: 'Jane Darwin',
     location: 'NDDC Hostel',
-    status: 'available'
+    status: 'available',
+    viewCount: 245,
+    offerCount: 3
   },
   {
     id: '2',
@@ -42,9 +46,11 @@ const MOCK_LISTINGS: Listing[] = [
     isNegotiable: true,
     description: 'Fairly used HP laptop, 256GB Ram, Core i5. Perfect for project research. Battery life is solid.',
     imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=800&auto=format&fit=crop',
-    seller: 'Obokobong', // Owner item
+    seller: 'Obokobong',
     location: 'NDDC Hostel',
-    status: 'available'
+    status: 'available',
+    viewCount: 120,
+    offerCount: 1
   },
   {
     id: '3',
@@ -55,7 +61,9 @@ const MOCK_LISTINGS: Listing[] = [
     imageUrl: 'https://images.unsplash.com/photo-1543674892-7d64d45df18b?q=80&w=800&auto=format&fit=crop',
     seller: 'Samuel K.',
     location: 'NDDC Hostel',
-    status: 'available'
+    status: 'available',
+    viewCount: 58,
+    offerCount: 0
   }
 ];
 
@@ -83,44 +91,64 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('Home');
   const [listings, setListings] = useState<Listing[]>(MOCK_LISTINGS);
   const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
-  const [allOffers, setAllOffers] = useState<Offer[]>([
-    {
-      id: 'mock_offer_1',
-      listingId: '2', // Offer received on owner's laptop
-      listingTitle: 'HP Laptop',
-      listingImage: '...',
-      originalPrice: 275000,
-      offeredPrice: 250000,
-      buyerName: 'Jessica Ama',
-      buyerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-      message: 'I can pay cash today!',
-      status: 'pending',
-      timestamp: '2h ago'
-    }
-  ]);
+  const [allOffers, setAllOffers] = useState<Offer[]>([]);
   const [savedItems, setSavedItems] = useState<string[]>([]);
-  const [viewHistory, setViewHistory] = useState<ViewRecord[]>([
-    { listingId: '1', lastViewedPrice: 75000, timestamp: Date.now() - 1000000 }
-  ]);
+  const [viewHistory, setViewHistory] = useState<ViewRecord[]>([]);
   
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showBroadcastForm, setShowBroadcastForm] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [sortBy, setSortBy] = useState('Newest');
   
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  // Intuitive behavior: Start expanded to show content, then collapse to show it's interactive
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+  const { showToast } = useToast();
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const productGridRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const categories = useMemo(() => ['All Categories', 'Electronics', 'Books', 'Fashion', 'Kitchen', 'Home and furniture'], []);
+  const sortOptions = useMemo(() => ['Newest', 'Price: Low to High', 'Price: High to Low', 'Urgent First'], []);
+
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    const suggestions: { type: 'category' | 'listing'; label: string; extra?: string }[] = [];
+    
+    categories.forEach(cat => {
+      if (cat !== 'All Categories' && cat.toLowerCase().includes(query)) {
+        suggestions.push({ type: 'category', label: cat });
+      }
+    });
+
+    listings.forEach(item => {
+      if (item.title.toLowerCase().includes(query)) {
+        suggestions.push({ type: 'listing', label: item.title, extra: `₦${item.price.toLocaleString()}` });
+      }
+    });
+
+    return suggestions.slice(0, 6);
+  }, [searchQuery, listings, categories]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(timer);
+    // Show expanded sidebar for 1.5s then collapse to teach interactivity
+    const sidebarTimer = setTimeout(() => setIsSidebarExpanded(false), 1500);
+    const loaderTimer = setTimeout(() => setIsLoading(false), 800);
+    
+    return () => {
+      clearTimeout(sidebarTimer);
+      clearTimeout(loaderTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -128,9 +156,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchSuggestions(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const scrollToGrid = useCallback(() => {
+    if (productGridRef.current) {
+      const offset = 80;
+      const elementPosition = productGridRef.current.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + (scrollContainerRef.current?.scrollTop || 0) - offset;
+      
+      scrollContainerRef.current?.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
   }, []);
 
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -138,6 +182,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   const handleOpenProduct = (listing: Listing) => {
+    setListings(prev => prev.map(l => l.id === listing.id ? { ...l, viewCount: (l.viewCount || 0) + 1 } : l));
     setSelectedListing(listing);
     setViewHistory(prev => {
       const exists = prev.find(v => v.listingId === listing.id);
@@ -173,28 +218,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const handleMakeOffer = (amount: number, message: string) => {
     if (!selectedListing) return;
-    setAllOffers(prev => {
-      const existingIdx = prev.findIndex(o => o.listingId === selectedListing.id && o.buyerName === (user?.name || 'Obokobong'));
-      if (existingIdx >= 0) {
-        const updated = [...prev];
-        updated[existingIdx] = { ...updated[existingIdx], offeredPrice: amount, message, timestamp: 'Just now' };
-        return updated;
-      }
-      const newOffer: Offer = {
-        id: `offer_${Date.now()}`,
-        listingId: selectedListing.id,
-        listingTitle: selectedListing.title,
-        listingImage: selectedListing.imageUrl,
-        originalPrice: selectedListing.price,
-        offeredPrice: amount,
-        buyerName: user?.name || 'Obokobong',
-        buyerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-        message,
-        status: 'pending',
-        timestamp: 'Just now'
-      };
-      return [newOffer, ...prev];
-    });
+    const newOffer: Offer = {
+      id: `offer_${Date.now()}`,
+      listingId: selectedListing.id,
+      listingTitle: selectedListing.title,
+      listingImage: selectedListing.imageUrl,
+      originalPrice: selectedListing.price,
+      offeredPrice: amount,
+      buyerName: user?.name || 'Obokobong',
+      buyerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+      message,
+      status: 'pending',
+      timestamp: 'Just now'
+    };
+    setAllOffers(prev => [newOffer, ...prev]);
+    setListings(prev => prev.map(l => l.id === selectedListing.id ? { ...l, offerCount: (l.offerCount || 0) + 1 } : l));
   };
 
   const handleWithdrawOffer = (offerId: string) => {
@@ -204,6 +242,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const handleMarkSold = (listingId: string) => {
     setListings(prev => prev.map(l => l.id === listingId ? { ...l, status: 'sold' } : l));
     setSelectedListing(prev => prev && prev.id === listingId ? { ...prev, status: 'sold' } : prev);
+    showToast('Success', 'Item marked as sold and moved to history.', 'success');
+  };
+
+  const handleDeleteListing = (listingId: string) => {
+    setListings(prev => prev.filter(l => l.id !== listingId));
+    showToast('Deleted', 'Listing removed successfully.', 'info');
+  };
+
+  const handleEditListingSubmit = (updatedData: any) => {
+    setListings(prev => prev.map(l => l.id === updatedData.id ? { ...l, ...updatedData } : l));
+    setEditingListing(null);
+  };
+
+  const handleSelectSuggestion = (suggestion: any) => {
+    setSearchQuery(suggestion.label);
+    setShowSearchSuggestions(false);
+    setSelectedListing(null);
+    if (activeTab !== 'Home' || showBroadcastForm) {
+      setActiveTab('Home');
+      setShowBroadcastForm(false);
+    }
+    setTimeout(scrollToGrid, 150);
+    if (suggestion.type === 'category') {
+      setSelectedCategory(suggestion.label);
+    }
   };
 
   const filteredListings = useMemo(() => {
@@ -229,17 +292,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     { name: 'Messages', icon: MessageSquare },
   ];
 
-  const categories = ['All Categories', 'Electronics', 'Books', 'Fashion', 'Kitchen', 'Home and furniture'];
-  const sortOptions = ['Newest', 'Price: Low to High', 'Price: High to Low', 'Urgent First'];
-
   const renderContent = () => {
     if (showBroadcastForm) return <div className="p-4 md:p-8"><BroadcastForm onBack={() => setShowBroadcastForm(false)} /></div>;
+    if (editingListing) return <ListingForm initialData={editingListing} onClose={() => setEditingListing(null)} onSubmit={handleEditListingSubmit} />;
     
     switch (activeTab) {
       case 'Broadcasts':
         return <div className="p-4 md:p-8"><BroadcastsView onRespond={(b) => startChat(b.author, b.authorAvatar, { title: b.need, price: b.budgetMax, imageUrl: b.authorAvatar })} /></div>;
       case 'Add Product':
-        return <ListingForm onClose={() => setActiveTab('Home')} onSubmit={(l) => { setListings([{ ...l, status: 'available', seller: user?.name || 'Obokobong' }, ...listings]); setActiveTab('Home'); }} />;
+        return <ListingForm onClose={() => setActiveTab('Home')} onSubmit={(l) => { setListings([{ ...l, id: Date.now().toString(), status: 'available', seller: user?.name || 'Obokobong', viewCount: 0, offerCount: 0 }, ...listings]); setActiveTab('Home'); }} />;
       case 'Notifications':
         return <div className="p-4 md:p-8"><NotificationsView onAction={(p) => { if(p.type === 'view_listing') handleOpenProduct(listings[0]); }} /></div>;
       case 'Messages':
@@ -247,7 +308,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           setChats(prev => prev.map(c => c.id === chatId ? { ...c, messages: [...c.messages, { id: Date.now().toString(), text, timestamp: 'now', senderId: 'me' }], lastMessage: text } : c));
         }} />;
       case 'Profile':
-        return <ProfileView user={user} listings={listings.filter(l => l.seller === (user?.name || 'Obokobong'))} />;
+        return <ProfileView 
+          user={user} 
+          listings={listings.filter(l => l.seller === (user?.name || 'Obokobong'))} 
+          onEditListing={(l) => { setEditingListing(l); }}
+          onDeleteListing={handleDeleteListing}
+          onMarkSold={handleMarkSold}
+          onAddProductClick={() => setActiveTab('Add Product')}
+          onOpenListing={handleOpenProduct}
+        />;
       default:
         return (
           <div className="p-4 md:p-8">
@@ -263,7 +332,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </div>
             </div>
 
-            <div className={`sticky top-[-1px] z-30 transition-all duration-300 py-4 -mx-4 md:-mx-8 px-4 md:px-8 bg-[#F8FAFB]/95 backdrop-blur-md mb-6 md:mb-10 ${isScrolled ? 'border-b border-gray-100 shadow-sm' : ''}`}>
+            <div ref={productGridRef} className={`sticky top-[-1px] z-30 transition-all duration-300 py-4 -mx-4 md:-mx-8 px-4 md:px-8 bg-[#F8FAFB]/95 backdrop-blur-md mb-6 md:mb-10 ${isScrolled ? 'border-b border-gray-100 shadow-sm' : ''}`}>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide">
                   <div className="relative shrink-0">
@@ -312,7 +381,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 ))
               ) : filteredListings.length > 0 ? (
                 filteredListings.map((item) => {
-                  const hasOffer = allOffers.find(o => o.listingId === item.id && o.buyerName === (user?.name || 'Obokobong'));
                   const isSaved = savedItems.includes(item.id);
                   const prevView = viewHistory.find(v => v.listingId === item.id);
                   const isPriceDropped = prevView && prevView.lastViewedPrice > item.price;
@@ -326,24 +394,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     >
                       <div className="relative aspect-square md:aspect-[4/5] overflow-hidden bg-gray-50">
                         <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
-                        
                         <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
                           {item.status === 'sold' ? (
-                            <div className="bg-gray-900 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">
-                              Sold
-                            </div>
+                            <div className="bg-gray-900 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">Sold</div>
                           ) : item.isUrgent && (
-                            <div className="bg-orange-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg animate-pulse">
-                              Urgent
-                            </div>
-                          )}
-                          {isPriceDropped && item.status !== 'sold' && (
-                            <div className="bg-green-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">
-                              Price Drop
-                            </div>
+                            <div className="bg-orange-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg animate-pulse">Urgent</div>
                           )}
                         </div>
-
                         {!isOwner && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); toggleSave(item.id); }}
@@ -351,12 +408,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                           >
                             <Heart size={16} fill={isSaved ? 'white' : 'none'} />
                           </button>
-                        )}
-
-                        {hasOffer && item.status !== 'sold' && (
-                          <div className="absolute bottom-3 left-3 bg-amber-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider z-10 shadow-lg border border-white/20">
-                            Offer Sent
-                          </div>
                         )}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
                       </div>
@@ -371,7 +422,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                           {isOwner ? (
                              <span className="text-[8px] md:text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md uppercase border border-gray-100">Mine</span>
                           ) : (
-                            item.isNegotiable && item.status !== 'sold' && <span className="text-[8px] md:text-[10px] font-black text-sellit bg-sellit/10 px-2 py-0.5 rounded-md uppercase">Neg.</span>
+                            item.isNegotiable && item.status !== 'sold' && <span className="text-[8px] md:text-[10px] font-black text-sellit bg-sellit/10 px-2 py-0.5 rounded-md uppercase">Negotiable</span>
                           )}
                         </div>
                       </div>
@@ -401,51 +452,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#F8FAFB] overflow-hidden">
-      {/* Sidebar Navigation (Desktop) */}
       <aside className={`hidden md:flex bg-white border-r border-gray-100 flex-col shrink-0 z-40 transition-all duration-500 ${isSidebarExpanded ? 'w-64' : 'w-24'}`}>
         <div className={`p-6 flex ${isSidebarExpanded ? 'items-center justify-between' : 'flex-col items-center gap-8'}`}>
           {!isSidebarExpanded && (
-            <button 
-              onClick={() => setIsSidebarExpanded(true)} 
-              className="p-3 bg-gray-100/50 text-gray-500 hover:text-gray-900 rounded-2xl transition-all"
-            >
+            <button onClick={() => setIsSidebarExpanded(true)} className="p-3 bg-gray-100/50 text-gray-500 hover:text-gray-900 rounded-2xl transition-all">
               <PanelLeftOpen size={24} />
             </button>
           )}
-          
           <div className="transition-all duration-500">
             {isSidebarExpanded ? (
               <div className="flex items-center justify-between w-full">
                 <Logo />
-                <button 
-                  onClick={() => setIsSidebarExpanded(false)} 
-                  className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors ml-4"
-                >
+                <button onClick={() => setIsSidebarExpanded(false)} className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors ml-4">
                   <PanelLeftClose size={20} />
                 </button>
               </div>
             ) : (
-              <div className="w-14 h-14 rounded-2xl bg-sellit/10 flex items-center justify-center text-sellit font-black text-2xl shadow-sm border border-sellit/5">
-                S
-              </div>
+              <div className="w-14 h-14 rounded-2xl bg-sellit/10 flex items-center justify-center text-sellit font-black text-2xl shadow-sm border border-sellit/5">S</div>
             )}
           </div>
         </div>
-
         <nav className={`flex-1 px-4 space-y-3 mt-6 ${!isSidebarExpanded ? 'flex flex-col items-center' : ''}`}>
           {navItems.map((item) => {
-            const isActive = activeTab === item.name && !showBroadcastForm;
+            const isActive = activeTab === item.name && !showBroadcastForm && !editingListing;
             const Icon = item.icon;
             return (
-              <button 
-                key={item.name} 
-                onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }} 
-                className={`flex items-center font-black transition-all duration-300 ${
-                  isSidebarExpanded 
-                    ? `w-full p-4 rounded-2xl gap-4 ${isActive ? 'bg-sellit text-white shadow-xl shadow-sellit/20 translate-x-1' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'}`
-                    : `p-4 rounded-2xl justify-center ${isActive ? 'bg-sellit text-white shadow-xl shadow-sellit/20 scale-110' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'}`
-                }`}
-              >
+              <button key={item.name} onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); setEditingListing(null); setSelectedListing(null); }} className={`flex items-center font-black transition-all duration-300 ${isSidebarExpanded ? `w-full p-4 rounded-2xl gap-4 ${isActive ? 'bg-sellit text-white shadow-xl shadow-sellit/20 translate-x-1' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'}` : `p-4 rounded-2xl justify-center ${isActive ? 'bg-sellit text-white shadow-xl shadow-sellit/20 scale-110' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'}`}`}>
                 <Icon size={24} className="shrink-0" />
                 {isSidebarExpanded && <span className="text-sm uppercase tracking-wider">{item.name}</span>}
               </button>
@@ -454,120 +486,77 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </nav>
       </aside>
 
-      {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] pt-2 pb-5">
         <div className="flex justify-between items-center h-14 px-8 relative">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.name && !showBroadcastForm;
-            
+            const isActive = activeTab === item.name && !showBroadcastForm && !editingListing;
             if (item.isPrimary) {
               return (
                 <div key={item.name} className="relative -top-2 flex flex-col items-center">
-                  <button 
-                    onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }}
-                    className="w-16 h-16 bg-sellit text-white rounded-[1.75rem] shadow-2xl shadow-sellit/40 flex items-center justify-center active:scale-90 transition-transform border-[6px] border-white"
-                  >
+                  <button onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); setEditingListing(null); setSelectedListing(null); }} className="w-16 h-16 bg-sellit text-white rounded-[1.75rem] shadow-2xl shadow-sellit/40 flex items-center justify-center active:scale-90 transition-transform border-[6px] border-white">
                     <Plus size={32} className="stroke-[3]" />
                   </button>
                 </div>
               );
             }
-
             return (
-              <button 
-                key={item.name} 
-                onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }}
-                className={`flex flex-col items-center justify-center transition-all ${
-                  isActive ? 'text-sellit' : 'text-gray-400'
-                }`}
-              >
-                <div className="p-1">
-                  <Icon size={28} className={isActive ? 'stroke-[2.5]' : 'stroke-[1.5]'} />
-                </div>
+              <button key={item.name} onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); setEditingListing(null); setSelectedListing(null); }} className={`flex flex-col items-center justify-center transition-all ${isActive ? 'text-sellit' : 'text-gray-400'}`}>
+                <div className="p-1"><Icon size={28} className={isActive ? 'stroke-[2.5]' : 'stroke-[1.5]'} /></div>
               </button>
             );
           })}
         </div>
       </nav>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 shrink-0 z-50">
-          <div className="flex-1 max-w-2xl relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search anything on campus..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 md:py-3.5 bg-gray-50 border-none rounded-2xl text-sm md:text-base outline-none focus:ring-4 focus:ring-sellit/5 transition-all font-bold text-gray-900 placeholder:text-gray-400" 
-            />
+          <div className="flex-1 max-w-2xl relative" ref={searchRef}>
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-300 ${showSearchSuggestions ? 'text-sellit' : 'text-gray-400'}`} size={18} />
+            <input type="text" placeholder="Search anything on campus..." value={searchQuery} onFocus={() => setShowSearchSuggestions(true)} onChange={(e) => { setSearchQuery(e.target.value); setShowSearchSuggestions(true); }} onKeyDown={(e) => { if (e.key === 'Enter') { setShowSearchSuggestions(false); setSelectedListing(null); if (activeTab !== 'Home' || showBroadcastForm) { setActiveTab('Home'); setShowBroadcastForm(false); } setTimeout(scrollToGrid, 100); } }} className="w-full pl-12 pr-4 py-2.5 md:py-3.5 bg-gray-50 border-none rounded-2xl text-sm md:text-base outline-none focus:ring-4 focus:ring-sellit/5 transition-all font-bold text-gray-900 placeholder:text-gray-400 shadow-inner" />
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-3 bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200 ring-1 ring-black/5">
+                <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><Sparkles size={12} className="text-sellit" /> Smart Search</p>
+                  <button onClick={() => setShowSearchSuggestions(false)} className="text-[10px] font-black text-gray-300 hover:text-gray-500 uppercase">Dismiss</button>
+                </div>
+                <div className="max-h-[350px] overflow-y-auto scrollbar-hide py-2">
+                  {searchSuggestions.map((suggestion, idx) => (
+                    <button key={`${suggestion.type}-${idx}`} onClick={() => handleSelectSuggestion(suggestion)} className="w-full flex items-center justify-between px-6 py-4 hover:bg-sellit/5 transition-colors group border-b border-gray-50 last:border-0">
+                      <div className="flex items-center gap-4 text-left">
+                        <div className={`p-2.5 rounded-xl ${suggestion.type === 'category' ? 'bg-sellit/10 text-sellit' : suggestion.type === 'listing' ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-500'}`}>{suggestion.type === 'category' ? <Tag size={16} /> : suggestion.type === 'listing' ? <PackageX size={16} /> : <TrendingUp size={16} />}</div>
+                        <div><p className="text-sm font-bold text-gray-900 group-hover:text-sellit transition-colors">{suggestion.label}</p><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{suggestion.type}</p></div>
+                      </div>
+                      <div className="flex items-center gap-2">{suggestion.extra && <span className="text-xs font-black text-sellit bg-sellit/5 px-3 py-1 rounded-lg border border-sellit/10">{suggestion.extra}</span>}<ArrowRight size={14} className="text-gray-200 group-hover:text-sellit group-hover:translate-x-1 transition-all" /></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          
           <div className="ml-4 flex items-center gap-2 md:gap-5 relative" ref={profileDropdownRef}>
-             <button 
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-3 group focus:outline-none"
-             >
-               <div className="hidden sm:flex flex-col items-end transition-opacity group-hover:opacity-80">
-                 <span className="text-xs font-black text-gray-900">{user?.name || 'Obokobong'}</span>
-                 <span className="text-[9px] font-black text-sellit uppercase tracking-widest">NDDC Hostel</span>
-               </div>
-               <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gray-50 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden ring-1 ring-gray-100 group-hover:ring-sellit/30 transition-all">
-                  <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100" className="w-full h-full object-cover" alt="Profile" />
-               </div>
+             <button onClick={() => setIsProfileOpen(!isProfileOpen)} className="flex items-center gap-3 group focus:outline-none">
+               <div className="hidden sm:flex flex-col items-end transition-opacity group-hover:opacity-80"><span className="text-xs font-black text-gray-900">{user?.name || 'Obokobong'}</span><span className="text-[9px] font-black text-sellit uppercase tracking-widest">NDDC Hostel</span></div>
+               <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gray-50 border-2 border-white shadow-sm flex items-center justify-center overflow-hidden ring-1 ring-gray-100 group-hover:ring-sellit/30 transition-all"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100" className="w-full h-full object-cover" alt="Profile" /></div>
              </button>
-
              {isProfileOpen && (
                <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[100] ring-1 ring-black/5">
-                 <div className="p-6 border-b border-gray-50 bg-gray-50/30">
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p>
-                   <p className="text-sm font-black text-gray-900 truncate">{user?.email || 'ubokobong@gmail.com'}</p>
-                 </div>
+                 <div className="p-6 border-b border-gray-50 bg-gray-50/30"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p><p className="text-sm font-black text-gray-900 truncate">{user?.email || 'ubokobong@gmail.com'}</p></div>
                  <div className="p-2">
-                   <button onClick={() => { setIsProfileOpen(false); setActiveTab('Profile'); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
-                     <UserCircle size={18} className="text-gray-400" />
-                     My Profile
-                   </button>
-                   <button onClick={() => { setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
-                     <Settings size={18} className="text-gray-400" />
-                     Settings
-                   </button>
+                   <button onClick={() => { setIsProfileOpen(false); setActiveTab('Profile'); setSelectedListing(null); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"><UserCircle size={18} className="text-gray-400" /> My Profile</button>
+                   <button onClick={() => { setIsProfileOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"><Settings size={18} className="text-gray-400" /> Settings</button>
                    <div className="h-px bg-gray-50 my-1 mx-2" />
-                   <button 
-                     onClick={() => { setIsProfileOpen(false); onLogout(); }} 
-                     className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
-                   >
-                     <LogOut size={18} />
-                     Sign Out
-                   </button>
+                   <button onClick={() => { setIsProfileOpen(false); onLogout(); setSelectedListing(null); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"><LogOut size={18} /> Sign Out</button>
                  </div>
                </div>
              )}
           </div>
         </header>
-
-        <main onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-hide relative bg-[#F8FAFB]">
-          {renderContent()}
-        </main>
+        <main ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-hide relative bg-[#F8FAFB] scroll-smooth">{renderContent()}</main>
       </div>
-
       {selectedListing && (
         <ProductDetail 
-          listing={selectedListing} 
-          userOffer={currentOffer}
-          receivedOffers={receivedOffers}
-          existingChat={existingChat}
-          lastViewedPrice={lastViewedPrice}
-          isOwner={isSelectedOwner}
-          isSaved={savedItems.includes(selectedListing.id)}
-          onClose={() => setSelectedListing(null)} 
-          onContact={() => startChat(selectedListing.seller, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', { title: selectedListing.title, price: selectedListing.price, imageUrl: selectedListing.imageUrl })} 
-          onMakeOffer={handleMakeOffer}
-          onWithdrawOffer={handleWithdrawOffer}
-          onToggleSave={toggleSave}
-          onMarkSold={handleMarkSold}
+          listing={selectedListing} userOffer={currentOffer} receivedOffers={receivedOffers} existingChat={existingChat} lastViewedPrice={lastViewedPrice} isOwner={isSelectedOwner} isSaved={savedItems.includes(selectedListing.id)} onClose={() => setSelectedListing(null)} onContact={() => { startChat(selectedListing.seller, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', { title: selectedListing.title, price: selectedListing.price, imageUrl: selectedListing.imageUrl }); setSelectedListing(null); }} onMakeOffer={handleMakeOffer} onWithdrawOffer={handleWithdrawOffer} onToggleSave={toggleSave} onMarkSold={handleMarkSold} onEdit={() => { setEditingListing(selectedListing); setSelectedListing(null); }} onDelete={() => { handleDeleteListing(selectedListing.id); setSelectedListing(null); }}
         />
       )}
     </div>
