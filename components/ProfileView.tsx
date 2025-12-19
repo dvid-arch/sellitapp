@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-/* Added missing Plus icon import to fix the compilation error */
 import { 
   User, Package, History, Radio, Settings, Edit2, 
   MapPin, Star, CheckCircle2, MoreVertical, Trash2, 
@@ -44,7 +43,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, listings }) => {
             </div>
             
             <div className="flex-1 md:pb-4">
-              <div className="flex flex-wrap items-center gap-3 mb-2">
+              <div className="flex wrap items-center gap-3 mb-2">
                 <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight">{user?.name || 'Obokobong'}</h1>
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-sellit/5 text-sellit rounded-full text-[10px] md:text-xs font-black uppercase tracking-widest border border-sellit/10">
                   <CheckCircle2 size={14} className="fill-current text-white" />
@@ -112,7 +111,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, listings }) => {
       {/* Content Area */}
       <div className="animate-in fade-in duration-500">
         {activeSubTab === 'listings' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
             {listings.map((item) => (
               <div key={item.id} className="group bg-white rounded-[2rem] overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-500">
                 <div className="relative aspect-square">

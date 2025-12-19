@@ -46,7 +46,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ chats, activeChatId, onSelec
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 lg:px-4 space-y-1 scrollbar-hide pb-20 md:pb-4">
+        <div className="flex-1 overflow-y-auto px-2 lg:px-4 space-y-1 scrollbar-hide pb-24 md:pb-4">
           {chats.filter(c => c.contactName.toLowerCase().includes(sidebarSearch.toLowerCase())).map((chat) => (
             <div 
               key={chat.id}
@@ -93,7 +93,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ chats, activeChatId, onSelec
           </div>
         ) : (
           <>
-            <header className="px-4 md:px-8 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-md sticky top-0">
+            <header className="px-4 md:px-8 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-md sticky top-0 z-20">
               <div className="flex items-center gap-3">
                 <button onClick={() => onSelectChat(null)} className="md:hidden p-1.5 -ml-1 text-gray-500 hover:bg-gray-50 rounded-lg"><ChevronLeft size={24} /></button>
                 <img src={selectedChat.contactAvatar} className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-gray-100" />
@@ -115,7 +115,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ chats, activeChatId, onSelec
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-4 scrollbar-hide pb-24 md:pb-8">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-4 scrollbar-hide pb-6">
               {selectedChat.messages.map((msg) => (
                 <div key={msg.id} className={`flex flex-col ${msg.senderId === 'me' ? 'items-end' : 'items-start'}`}>
                   <div className={`max-w-[85%] md:max-w-[70%] px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-[2rem] text-sm md:text-base font-medium shadow-sm ${
@@ -133,7 +133,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ chats, activeChatId, onSelec
               )}
             </div>
 
-            <div className="p-4 md:p-8 shrink-0 bg-white border-t border-gray-100 sticky bottom-0 z-10 pb-20 md:pb-8">
+            <div className="p-4 md:p-8 shrink-0 bg-white border-t border-gray-100 sticky bottom-0 z-10 pb-6 md:pb-8">
               <div className="bg-gray-50 border border-gray-200 rounded-3xl p-1 flex items-center shadow-inner">
                 <button className="p-2 text-gray-400 hover:text-gray-900 transition-colors"><Smile size={24} /></button>
                 <input 

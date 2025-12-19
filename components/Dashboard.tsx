@@ -1,20 +1,18 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Plus, Search, MapPin, Bell, MessageSquare, Home, 
   ChevronDown, Filter, PackageX, LogOut, PanelLeftClose, PanelLeftOpen,
-  ArrowUpDown, Radio, User as UserIcon, SlidersHorizontal, Settings, UserCircle
+  ArrowUpDown, Radio, UserCircle, Settings
 } from 'lucide-react';
-import { Logo } from '../constants';
-import { User, Listing, Offer, Broadcast, Chat } from '../types';
-import { ListingForm } from './ListingForm';
-import { ProductDetail } from './ProductDetail';
-import { BroadcastForm } from './BroadcastForm';
-import { BroadcastsView } from './BroadcastsView';
-import { ChatView } from './ChatView';
-import { NotificationsView } from './NotificationsView';
-import { OfferView } from './OfferView';
-import { ProfileView } from './ProfileView';
+import { Logo } from '../constants.tsx';
+import { User, Listing, Chat } from '../types.ts';
+import { ListingForm } from './ListingForm.tsx';
+import { ProductDetail } from './ProductDetail.tsx';
+import { BroadcastForm } from './BroadcastForm.tsx';
+import { BroadcastsView } from './BroadcastsView.tsx';
+import { ChatView } from './ChatView.tsx';
+import { NotificationsView } from './NotificationsView.tsx';
+import { ProfileView } from './ProfileView.tsx';
 
 interface DashboardProps {
   user: User | null;
@@ -107,12 +105,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [showBroadcastForm, setShowBroadcastForm] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   
-  // Filtering & Sorting State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [sortBy, setSortBy] = useState('Newest');
   
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -124,7 +121,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle clicks outside profile dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
@@ -178,7 +174,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const navItems = [
     { name: 'Home', icon: Home },
     { name: 'Broadcasts', icon: Radio },
-    { name: 'Add Product', icon: Plus, primary: true },
+    { name: 'Add Product', icon: Plus, isPrimary: true },
     { name: 'Notifications', icon: Bell },
     { name: 'Messages', icon: MessageSquare },
   ];
@@ -205,7 +201,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       default:
         return (
           <div className="p-4 md:p-8">
-            {/* Responsive Hero */}
             <div className="relative w-full h-44 md:h-80 rounded-[2rem] md:rounded-[3rem] overflow-hidden mb-8 md:mb-12 bg-sellit text-white shadow-2xl shadow-sellit/20 flex flex-col justify-center px-6 md:px-16 group">
               <div className="absolute inset-0 bg-gradient-to-r from-sellit-dark via-sellit to-transparent opacity-90 z-10" />
               <div className="relative z-20 max-w-xl">
@@ -218,7 +213,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </div>
             </div>
 
-            {/* Robust Filter Bar - Responsive */}
             <div className={`sticky top-[-1px] z-30 transition-all duration-300 py-4 -mx-4 md:-mx-8 px-4 md:px-8 bg-[#F8FAFB]/95 backdrop-blur-md mb-6 md:mb-10 ${isScrolled ? 'border-b border-gray-100 shadow-sm' : ''}`}>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-2 md:gap-4 overflow-x-auto scrollbar-hide">
@@ -257,11 +251,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               </div>
             </div>
             
-            {/* Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-8 pb-28 md:pb-12">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8 pb-20 md:pb-12">
               {isLoading ? (
-                Array.from({length: 10}).map((_, i) => (
-                  <div key={i} className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] h-56 md:h-80 animate-pulse border border-gray-100 p-4">
+                Array.from({length: 8}).map((_, i) => (
+                  <div key={i} className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] h-64 md:h-96 animate-pulse border border-gray-100 p-4">
                     <div className="bg-gray-50 h-2/3 rounded-2xl mb-4" />
                     <div className="h-4 bg-gray-50 rounded w-3/4 mb-2" />
                     <div className="h-4 bg-gray-50 rounded w-1/2" />
@@ -306,52 +299,96 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#F8FAFB] overflow-hidden">
-      {/* DESKTOP SIDEBAR */}
       <aside className={`hidden md:flex bg-white border-r border-gray-100 flex-col shrink-0 z-40 transition-all duration-500 ${isSidebarExpanded ? 'w-64' : 'w-24'}`}>
-        <div className="p-6 flex items-center justify-between">
-          {isSidebarExpanded ? <Logo /> : <div className="w-12 h-12 rounded-2xl bg-sellit/10 flex items-center justify-center text-sellit font-black text-xl">S</div>}
-          <button onClick={() => setIsSidebarExpanded(!isSidebarExpanded)} className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors">
-            {isSidebarExpanded ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-          </button>
-        </div>
-        <nav className="flex-1 px-4 space-y-3 mt-6">
-          {navItems.map((item) => (
+        <div className={`p-6 flex ${isSidebarExpanded ? 'items-center justify-between' : 'flex-col items-center gap-8'}`}>
+          {!isSidebarExpanded && (
             <button 
-              key={item.name} 
-              onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }} 
-              className={`w-full flex items-center p-4 rounded-2xl font-black gap-4 transition-all duration-300 ${
-                activeTab === item.name && !showBroadcastForm ? 'bg-sellit text-white shadow-xl shadow-sellit/20 translate-x-1' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'
-              }`}
+              onClick={() => setIsSidebarExpanded(true)} 
+              className="p-3 bg-gray-100/50 text-gray-500 hover:text-gray-900 rounded-2xl transition-all"
             >
-              <item.icon size={24} className="shrink-0" />
-              {isSidebarExpanded && <span className="text-sm uppercase tracking-wider">{item.name}</span>}
+              <PanelLeftOpen size={24} />
             </button>
-          ))}
+          )}
+          
+          <div className="transition-all duration-500">
+            {isSidebarExpanded ? (
+              <div className="flex items-center justify-between w-full">
+                <Logo />
+                <button 
+                  onClick={() => setIsSidebarExpanded(false)} 
+                  className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors ml-4"
+                >
+                  <PanelLeftClose size={20} />
+                </button>
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-sellit/10 flex items-center justify-center text-sellit font-black text-2xl shadow-sm border border-sellit/5">
+                S
+              </div>
+            )}
+          </div>
+        </div>
+
+        <nav className={`flex-1 px-4 space-y-3 mt-6 ${!isSidebarExpanded ? 'flex flex-col items-center' : ''}`}>
+          {navItems.map((item) => {
+            const isActive = activeTab === item.name && !showBroadcastForm;
+            const Icon = item.icon;
+            return (
+              <button 
+                key={item.name} 
+                onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }} 
+                className={`flex items-center font-black transition-all duration-300 ${
+                  isSidebarExpanded 
+                    ? `w-full p-4 rounded-2xl gap-4 ${isActive ? 'bg-sellit text-white shadow-xl shadow-sellit/20 translate-x-1' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'}`
+                    : `p-4 rounded-2xl justify-center ${isActive ? 'bg-sellit text-white shadow-xl shadow-sellit/20 scale-110' : 'text-gray-400 hover:text-gray-900 hover:bg-gray-50'}`
+                }`}
+              >
+                <Icon size={24} className="shrink-0" />
+                {isSidebarExpanded && <span className="text-sm uppercase tracking-wider">{item.name}</span>}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
-      {/* MOBILE/TABLET BOTTOM NAVIGATION */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-2xl border-t border-gray-100 pt-2 pb-safe-offset-3">
-        <div className="flex justify-around items-end h-16">
-          {navItems.map((item) => (
-            <button 
-              key={item.name} 
-              onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }}
-              className={`flex flex-col items-center justify-center w-full h-full transition-all ${
-                item.primary ? '-translate-y-5 scale-110' : ''
-              } ${activeTab === item.name && !showBroadcastForm ? 'text-sellit' : 'text-gray-400'}`}
-            >
-              <div className={`${item.primary ? 'bg-sellit text-white p-4 rounded-[1.5rem] shadow-2xl shadow-sellit/40 active:scale-90 transition-transform ring-4 ring-white' : 'p-2'}`}>
-                <item.icon size={item.primary ? 28 : 24} />
-              </div>
-              {!item.primary && <span className="text-[9px] font-black mt-1 uppercase tracking-tighter">{item.name}</span>}
-            </button>
-          ))}
+      {/* MOBILE NAVIGATION - ONLY ICONS, LOWERED CENTRAL BUTTON */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] pt-2 pb-5">
+        <div className="flex justify-between items-center h-14 px-8 relative">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.name && !showBroadcastForm;
+            
+            if (item.isPrimary) {
+              return (
+                <div key={item.name} className="relative -top-2 flex flex-col items-center">
+                  <button 
+                    onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }}
+                    className="w-16 h-16 bg-sellit text-white rounded-[1.75rem] shadow-2xl shadow-sellit/40 flex items-center justify-center active:scale-90 transition-transform border-[6px] border-white"
+                  >
+                    <Plus size={32} className="stroke-[3]" />
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <button 
+                key={item.name} 
+                onClick={() => { setActiveTab(item.name); setShowBroadcastForm(false); }}
+                className={`flex flex-col items-center justify-center transition-all ${
+                  isActive ? 'text-sellit' : 'text-gray-400'
+                }`}
+              >
+                <div className="p-1">
+                  <Icon size={28} className={isActive ? 'stroke-[2.5]' : 'stroke-[1.5]'} />
+                </div>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* UNIVERSAL HEADER */}
         <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 shrink-0 z-30">
           <div className="flex-1 max-w-2xl relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -364,7 +401,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             />
           </div>
           
-          {/* USER PROFILE & DROPDOWN */}
           <div className="ml-4 flex items-center gap-2 md:gap-5 relative" ref={profileDropdownRef}>
              <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -380,7 +416,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                </div>
              </button>
 
-             {/* Profile Dropdown Menu */}
              {isProfileOpen && (
                <div className="absolute top-full right-0 mt-3 w-64 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[100] ring-1 ring-black/5">
                  <div className="p-6 border-b border-gray-50 bg-gray-50/30">

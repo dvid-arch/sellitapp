@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { AuthStep, User } from './types';
-import { Carousel } from './components/Carousel';
-import { AuthForms } from './components/AuthForms';
-import { VerificationForm } from './components/VerificationForm';
-import { Dashboard } from './components/Dashboard';
-import { ToastProvider } from './context/ToastContext';
+import { AuthStep, User } from './types.ts';
+import { Carousel } from './components/Carousel.tsx';
+import { AuthForms } from './components/AuthForms.tsx';
+import { VerificationForm } from './components/VerificationForm.tsx';
+import { Dashboard } from './components/Dashboard.tsx';
+import { ToastProvider } from './context/ToastContext.tsx';
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AuthStep>('signup');
