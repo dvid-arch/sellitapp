@@ -7,6 +7,9 @@ export interface User {
   phone: string;
 }
 
+export type OfferStatus = 'pending' | 'accepted' | 'declined' | 'withdrawn' | 'countered';
+export type ListingStatus = 'available' | 'pending_payment' | 'sold';
+
 export interface Listing {
   id: string;
   title: string;
@@ -19,20 +22,13 @@ export interface Listing {
   location: string;
   isUrgent?: boolean;
   isNegotiable?: boolean;
+  status: ListingStatus;
 }
 
-export interface Broadcast {
-  id: string;
-  author: string;
-  authorAvatar: string;
-  need: string;
-  details: string;
-  budgetMin: number;
-  budgetMax: number;
-  location: string;
-  time: string;
-  isBoosted: boolean;
-  category: string;
+export interface ViewRecord {
+  listingId: string;
+  lastViewedPrice: number;
+  timestamp: number;
 }
 
 export interface Offer {
@@ -45,14 +41,8 @@ export interface Offer {
   buyerName: string;
   buyerAvatar: string;
   message: string;
-}
-
-export interface CarouselSlide {
-  id: number;
-  title: string;
-  description: string;
-  imageUrl: string;
-  icon?: 'location';
+  status: OfferStatus;
+  timestamp: string;
 }
 
 export interface Message {
@@ -99,8 +89,30 @@ export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export interface Toast {
   id: string;
-  type: ToastType;
   title: string;
   message: string;
+  type: ToastType;
   duration?: number;
+}
+
+export interface CarouselSlide {
+  id: number;
+  title: string;
+  description: string;
+  imageUrl: string;
+  icon?: string;
+}
+
+export interface Broadcast {
+  id: string;
+  author: string;
+  authorAvatar: string;
+  need: string;
+  details: string;
+  budgetMin: number;
+  budgetMax: number;
+  location: string;
+  time: string;
+  isBoosted: boolean;
+  category: string;
 }

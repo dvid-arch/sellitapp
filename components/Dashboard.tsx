@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   Plus, Search, MapPin, Bell, MessageSquare, Home, 
   ChevronDown, Filter, PackageX, LogOut, PanelLeftClose, PanelLeftOpen,
-  ArrowUpDown, Radio, UserCircle, Settings
+  ArrowUpDown, Radio, UserCircle, Settings, Heart
 } from 'lucide-react';
 import { Logo } from '../constants.tsx';
-import { User, Listing, Chat } from '../types.ts';
+import { User, Listing, Chat, Offer, ViewRecord } from '../types.ts';
 import { ListingForm } from './ListingForm.tsx';
 import { ProductDetail } from './ProductDetail.tsx';
 import { BroadcastForm } from './BroadcastForm.tsx';
@@ -23,14 +24,15 @@ const MOCK_LISTINGS: Listing[] = [
   {
     id: '1',
     title: 'Mini Refrigerator',
-    price: 75000,
+    price: 65000,
     category: 'Electronics',
     isUrgent: true,
     isNegotiable: true,
     description: 'Small refrigerator, perfect for keeping drinks and snacks cold in your hostel room. High energy efficiency.',
     imageUrl: 'https://images.unsplash.com/photo-1571175452281-04a282879717?q=80&w=800&auto=format&fit=crop',
     seller: 'Jane Darwin',
-    location: 'NDDC Hostel'
+    location: 'NDDC Hostel',
+    status: 'available'
   },
   {
     id: '2',
@@ -40,8 +42,9 @@ const MOCK_LISTINGS: Listing[] = [
     isNegotiable: true,
     description: 'Fairly used HP laptop, 256GB Ram, Core i5. Perfect for project research. Battery life is solid.',
     imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=800&auto=format&fit=crop',
-    seller: 'Peter O.',
-    location: 'NDDC Hostel'
+    seller: 'Obokobong', // Owner item
+    location: 'NDDC Hostel',
+    status: 'available'
   },
   {
     id: '3',
@@ -51,44 +54,23 @@ const MOCK_LISTINGS: Listing[] = [
     description: 'Trusted model for science students. Works perfectly with no scratches.',
     imageUrl: 'https://images.unsplash.com/photo-1543674892-7d64d45df18b?q=80&w=800&auto=format&fit=crop',
     seller: 'Samuel K.',
-    location: 'NDDC Hostel'
-  },
-  {
-    id: '4',
-    title: 'PS4',
-    price: 375000,
-    category: 'Electronics',
-    isNegotiable: true,
-    description: 'Fully functional PS4 with two controllers. Ideal for gaming breaks.',
-    imageUrl: 'https://images.unsplash.com/photo-1507450966965-9a96dd4d98f0?q=80&w=800&auto=format&fit=crop',
-    seller: 'Mike T.',
-    location: 'Engineering Hall'
-  },
-  {
-    id: '6',
-    title: '2-Burner Gas Stove',
-    price: 35000,
-    category: 'Kitchen',
-    isNegotiable: true,
-    description: 'Perfect for hostel cooking. Compact and efficient.',
-    imageUrl: 'https://images.unsplash.com/photo-1521203050033-780598859941?q=80&w=800&auto=format&fit=crop',
-    seller: 'John Darwin',
-    location: 'Moremi Hall'
+    location: 'NDDC Hostel',
+    status: 'available'
   }
 ];
 
 const INITIAL_CHATS: Chat[] = [
   {
     id: 'chat_1',
-    contactName: 'John Darwin',
+    contactName: 'Jane Darwin',
     contactAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
     lastSeen: 'last seen 5 mins ago',
     lastMessage: 'Yes, it\'s still available.',
     lastMessageTime: '18:17',
     product: {
-      title: '2-Burner Gas Stove',
-      price: 35000,
-      imageUrl: 'https://images.unsplash.com/photo-1521203050033-780598859941?w=150'
+      title: 'Mini Refrigerator',
+      price: 65000,
+      imageUrl: 'https://images.unsplash.com/photo-1571175452281-04a282879717?w=150'
     },
     messages: [
       { id: 'm1', text: 'Hi! Is this still available?', timestamp: '18:16', senderId: 'me' },
@@ -101,6 +83,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('Home');
   const [listings, setListings] = useState<Listing[]>(MOCK_LISTINGS);
   const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
+  const [allOffers, setAllOffers] = useState<Offer[]>([
+    {
+      id: 'mock_offer_1',
+      listingId: '2', // Offer received on owner's laptop
+      listingTitle: 'HP Laptop',
+      listingImage: '...',
+      originalPrice: 275000,
+      offeredPrice: 250000,
+      buyerName: 'Jessica Ama',
+      buyerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
+      message: 'I can pay cash today!',
+      status: 'pending',
+      timestamp: '2h ago'
+    }
+  ]);
+  const [savedItems, setSavedItems] = useState<string[]>([]);
+  const [viewHistory, setViewHistory] = useState<ViewRecord[]>([
+    { listingId: '1', lastViewedPrice: 75000, timestamp: Date.now() - 1000000 }
+  ]);
+  
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [showBroadcastForm, setShowBroadcastForm] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
@@ -135,6 +137,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setIsScrolled(e.currentTarget.scrollTop > 100);
   };
 
+  const handleOpenProduct = (listing: Listing) => {
+    setSelectedListing(listing);
+    setViewHistory(prev => {
+      const exists = prev.find(v => v.listingId === listing.id);
+      if (exists) return prev;
+      return [...prev, { listingId: listing.id, lastViewedPrice: listing.price, timestamp: Date.now() }];
+    });
+  };
+
+  const toggleSave = (id: string) => {
+    setSavedItems(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
   const startChat = useCallback((contactName: string, avatar: string, product: { title: string, price: number, imageUrl: string }) => {
     const existingChat = chats.find(c => c.contactName === contactName && c.product.title === product.title);
     if (existingChat) {
@@ -155,6 +170,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
     setActiveTab('Messages');
   }, [chats]);
+
+  const handleMakeOffer = (amount: number, message: string) => {
+    if (!selectedListing) return;
+    setAllOffers(prev => {
+      const existingIdx = prev.findIndex(o => o.listingId === selectedListing.id && o.buyerName === (user?.name || 'Obokobong'));
+      if (existingIdx >= 0) {
+        const updated = [...prev];
+        updated[existingIdx] = { ...updated[existingIdx], offeredPrice: amount, message, timestamp: 'Just now' };
+        return updated;
+      }
+      const newOffer: Offer = {
+        id: `offer_${Date.now()}`,
+        listingId: selectedListing.id,
+        listingTitle: selectedListing.title,
+        listingImage: selectedListing.imageUrl,
+        originalPrice: selectedListing.price,
+        offeredPrice: amount,
+        buyerName: user?.name || 'Obokobong',
+        buyerAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+        message,
+        status: 'pending',
+        timestamp: 'Just now'
+      };
+      return [newOffer, ...prev];
+    });
+  };
+
+  const handleWithdrawOffer = (offerId: string) => {
+    setAllOffers(prev => prev.filter(o => o.id !== offerId));
+  };
+
+  const handleMarkSold = (listingId: string) => {
+    setListings(prev => prev.map(l => l.id === listingId ? { ...l, status: 'sold' } : l));
+    setSelectedListing(prev => prev && prev.id === listingId ? { ...prev, status: 'sold' } : prev);
+  };
 
   const filteredListings = useMemo(() => {
     let result = listings.filter(item => {
@@ -189,9 +239,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       case 'Broadcasts':
         return <div className="p-4 md:p-8"><BroadcastsView onRespond={(b) => startChat(b.author, b.authorAvatar, { title: b.need, price: b.budgetMax, imageUrl: b.authorAvatar })} /></div>;
       case 'Add Product':
-        return <ListingForm onClose={() => setActiveTab('Home')} onSubmit={(l) => { setListings([l, ...listings]); setActiveTab('Home'); }} />;
+        return <ListingForm onClose={() => setActiveTab('Home')} onSubmit={(l) => { setListings([{ ...l, status: 'available', seller: user?.name || 'Obokobong' }, ...listings]); setActiveTab('Home'); }} />;
       case 'Notifications':
-        return <div className="p-4 md:p-8"><NotificationsView onAction={(p) => { if(p.type === 'view_listing') setSelectedListing(listings[0]); }} /></div>;
+        return <div className="p-4 md:p-8"><NotificationsView onAction={(p) => { if(p.type === 'view_listing') handleOpenProduct(listings[0]); }} /></div>;
       case 'Messages':
         return <ChatView chats={chats} activeChatId={activeChatId} onSelectChat={setActiveChatId} onSendMessage={(chatId, text) => {
           setChats(prev => prev.map(c => c.id === chatId ? { ...c, messages: [...c.messages, { id: Date.now().toString(), text, timestamp: 'now', senderId: 'me' }], lastMessage: text } : c));
@@ -261,27 +311,73 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   </div>
                 ))
               ) : filteredListings.length > 0 ? (
-                filteredListings.map((item) => (
-                  <div key={item.id} onClick={() => setSelectedListing(item)} className="group bg-white rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border border-gray-100 hover:shadow-2xl hover:shadow-sellit/5 transition-all duration-500 cursor-pointer">
-                    <div className="relative aspect-square md:aspect-[4/5] overflow-hidden bg-gray-50">
-                      <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
-                      {item.isUrgent && (
-                        <div className="absolute top-3 right-3 bg-orange-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider z-10 shadow-lg animate-pulse">
-                          Urgent
+                filteredListings.map((item) => {
+                  const hasOffer = allOffers.find(o => o.listingId === item.id && o.buyerName === (user?.name || 'Obokobong'));
+                  const isSaved = savedItems.includes(item.id);
+                  const prevView = viewHistory.find(v => v.listingId === item.id);
+                  const isPriceDropped = prevView && prevView.lastViewedPrice > item.price;
+                  const isOwner = item.seller === (user?.name || 'Obokobong');
+
+                  return (
+                    <div 
+                      key={item.id} 
+                      onClick={() => handleOpenProduct(item)} 
+                      className={`group bg-white rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border border-gray-100 hover:shadow-2xl hover:shadow-sellit/5 transition-all duration-500 cursor-pointer relative ${item.status === 'sold' ? 'opacity-70' : ''}`}
+                    >
+                      <div className="relative aspect-square md:aspect-[4/5] overflow-hidden bg-gray-50">
+                        <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
+                        
+                        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+                          {item.status === 'sold' ? (
+                            <div className="bg-gray-900 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">
+                              Sold
+                            </div>
+                          ) : item.isUrgent && (
+                            <div className="bg-orange-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg animate-pulse">
+                              Urgent
+                            </div>
+                          )}
+                          {isPriceDropped && item.status !== 'sold' && (
+                            <div className="bg-green-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">
+                              Price Drop
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
-                    </div>
-                    <div className="p-4 md:p-6">
-                      <h3 className="font-black text-gray-900 text-sm md:text-lg leading-tight truncate group-hover:text-sellit transition-colors">{item.title}</h3>
-                      <p className="text-[10px] md:text-xs text-gray-400 font-bold mt-1 md:mt-2 line-clamp-1">{item.description}</p>
-                      <div className="flex items-center justify-between mt-3 md:mt-5 pt-3 border-t border-gray-50">
-                        <span className="text-sm md:text-xl font-black text-gray-900">₦{item.price.toLocaleString()}</span>
-                        {item.isNegotiable && <span className="text-[8px] md:text-[10px] font-black text-sellit bg-sellit/10 px-2 py-0.5 rounded-md uppercase">Neg.</span>}
+
+                        {!isOwner && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); toggleSave(item.id); }}
+                            className={`absolute top-3 left-3 p-2 rounded-xl transition-all z-10 ${isSaved ? 'bg-sellit text-white shadow-lg' : 'bg-white/80 text-gray-400 hover:text-sellit'}`}
+                          >
+                            <Heart size={16} fill={isSaved ? 'white' : 'none'} />
+                          </button>
+                        )}
+
+                        {hasOffer && item.status !== 'sold' && (
+                          <div className="absolute bottom-3 left-3 bg-amber-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider z-10 shadow-lg border border-white/20">
+                            Offer Sent
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
+                      </div>
+                      <div className="p-4 md:p-6">
+                        <h3 className="font-black text-gray-900 text-sm md:text-lg leading-tight truncate group-hover:text-sellit transition-colors">{item.title}</h3>
+                        <p className="text-[10px] md:text-xs text-gray-400 font-bold mt-1 md:mt-2 line-clamp-1">{item.description}</p>
+                        <div className="flex items-center justify-between mt-3 md:mt-5 pt-3 border-t border-gray-50">
+                          <div className="flex items-center gap-2">
+                             <span className={`text-sm md:text-xl font-black ${item.status === 'sold' ? 'text-gray-400' : 'text-gray-900'}`}>₦{item.price.toLocaleString()}</span>
+                             {isPriceDropped && item.status !== 'sold' && <span className="text-[10px] line-through text-gray-300">₦{prevView.lastViewedPrice.toLocaleString()}</span>}
+                          </div>
+                          {isOwner ? (
+                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md uppercase border border-gray-100">Mine</span>
+                          ) : (
+                            item.isNegotiable && item.status !== 'sold' && <span className="text-[8px] md:text-[10px] font-black text-sellit bg-sellit/10 px-2 py-0.5 rounded-md uppercase">Neg.</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="col-span-full py-24 md:py-40 flex flex-col items-center justify-center text-center">
                   <div className="w-20 h-20 bg-gray-50 rounded-[2rem] flex items-center justify-center text-gray-200 mb-8 border border-dashed border-gray-200">
@@ -297,8 +393,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   };
 
+  const currentOffer = selectedListing ? allOffers.find(o => o.listingId === selectedListing.id && o.buyerName === (user?.name || 'Obokobong')) : undefined;
+  const receivedOffers = selectedListing ? allOffers.filter(o => o.listingId === selectedListing.id && o.buyerName !== (user?.name || 'Obokobong')) : [];
+  const isSelectedOwner = selectedListing ? selectedListing.seller === (user?.name || 'Obokobong') : false;
+  const existingChat = selectedListing ? chats.find(c => c.contactName === selectedListing.seller && c.product.title === selectedListing.title) : undefined;
+  const lastViewedPrice = selectedListing ? viewHistory.find(v => v.listingId === selectedListing.id)?.lastViewedPrice : undefined;
+
   return (
     <div className="flex flex-col md:flex-row h-screen bg-[#F8FAFB] overflow-hidden">
+      {/* Sidebar Navigation (Desktop) */}
       <aside className={`hidden md:flex bg-white border-r border-gray-100 flex-col shrink-0 z-40 transition-all duration-500 ${isSidebarExpanded ? 'w-64' : 'w-24'}`}>
         <div className={`p-6 flex ${isSidebarExpanded ? 'items-center justify-between' : 'flex-col items-center gap-8'}`}>
           {!isSidebarExpanded && (
@@ -351,7 +454,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </nav>
       </aside>
 
-      {/* MOBILE NAVIGATION - ONLY ICONS, LOWERED CENTRAL BUTTON */}
+      {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] pt-2 pb-5">
         <div className="flex justify-between items-center h-14 px-8 relative">
           {navItems.map((item) => {
@@ -388,8 +491,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         </div>
       </nav>
 
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 shrink-0 z-30">
+        <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 shrink-0 z-50">
           <div className="flex-1 max-w-2xl relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
@@ -404,7 +508,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <div className="ml-4 flex items-center gap-2 md:gap-5 relative" ref={profileDropdownRef}>
              <button 
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                onFocus={() => setIsProfileOpen(true)}
                 className="flex items-center gap-3 group focus:outline-none"
              >
                <div className="hidden sm:flex flex-col items-end transition-opacity group-hover:opacity-80">
@@ -453,8 +556,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       {selectedListing && (
         <ProductDetail 
           listing={selectedListing} 
+          userOffer={currentOffer}
+          receivedOffers={receivedOffers}
+          existingChat={existingChat}
+          lastViewedPrice={lastViewedPrice}
+          isOwner={isSelectedOwner}
+          isSaved={savedItems.includes(selectedListing.id)}
           onClose={() => setSelectedListing(null)} 
           onContact={() => startChat(selectedListing.seller, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', { title: selectedListing.title, price: selectedListing.price, imageUrl: selectedListing.imageUrl })} 
+          onMakeOffer={handleMakeOffer}
+          onWithdrawOffer={handleWithdrawOffer}
+          onToggleSave={toggleSave}
+          onMarkSold={handleMarkSold}
         />
       )}
     </div>
