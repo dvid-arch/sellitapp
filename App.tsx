@@ -13,30 +13,37 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('sellit_user');
-    if (saved) {
-      setUser(JSON.parse(saved));
+    const savedUser = localStorage.getItem('sellit_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
       setStep('authenticated');
     }
   }, []);
 
   const handleSignup = (userData?: User) => {
-    if (userData) setUser(userData);
-    setStep('verify');
+    if (userData) {
+      setUser(userData);
+      setStep('verify');
+    }
   };
 
-  const handleLogin = () => {
-    const mockUser: User = { name: 'Obokobong', email: 'ubokobong@gmail.com', phone: '555-0123' };
+  const handleLogin = (credentials: any) => {
+    // In standalone mode, we simulate a successful login
+    const mockUser: User = {
+      name: 'Student User',
+      email: 'student@university.edu',
+      phone: '08012345678'
+    };
     setUser(mockUser);
-    setStep('authenticated');
     localStorage.setItem('sellit_user', JSON.stringify(mockUser));
+    setStep('authenticated');
   };
 
   const handleVerificationSuccess = () => {
-    setStep('authenticated');
     if (user) {
       localStorage.setItem('sellit_user', JSON.stringify(user));
     }
+    setStep('authenticated');
   };
 
   const handleLogout = () => {
@@ -64,7 +71,10 @@ const App: React.FC = () => {
                   <AuthForms 
                     type={step === 'forgot_password' ? 'forgot_password' : step as 'signup' | 'login'} 
                     onSwitch={(newType) => setStep(newType as AuthStep)} 
-                    onSubmit={step === 'signup' ? handleSignup : handleLogin} 
+                    onSubmit={(data) => {
+                      if (step === 'signup') handleSignup(data);
+                      else handleLogin(data);
+                    }} 
                   />
                 </div>
               )}

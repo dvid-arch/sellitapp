@@ -14,11 +14,11 @@ interface State {
 /**
  * ErrorBoundary component to catch rendering errors and show a fallback UI.
  */
-// Use React.Component explicitly to ensure proper type inheritance in class components
-export class ErrorBoundary extends React.Component<Props, State> {
+// Use Component directly to ensure proper type inheritance in class components
+export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    // Initialize state within the constructor as per React class component standards
+    // Initialize state within the constructor to avoid inheritance resolution issues
     this.state = {
       hasError: false
     };
@@ -33,7 +33,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public render() {
-    // Access state directly from the class instance
+    // Access state directly from the class instance to satisfy compiler checks
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[#F8FAFB] flex items-center justify-center p-6">
@@ -56,7 +56,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 Refresh Application
               </button>
               <button 
-                // Access setState correctly from the Component base class
+                // Use standard setState from Component base class
                 onClick={() => this.setState({ hasError: false })}
                 className="w-full text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-colors"
               >
@@ -68,7 +68,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Return children from props property of the base class
+    // Return children from props property of the base Component class
     return this.props.children;
   }
 }
