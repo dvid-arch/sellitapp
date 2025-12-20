@@ -6,12 +6,12 @@ import { AuthForms } from './components/AuthForms.tsx';
 import { VerificationForm } from './components/VerificationForm.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
 import { ToastProvider } from './context/ToastContext.tsx';
+import { ConnectivityBanner } from './components/ConnectivityBanner.tsx';
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AuthStep>('signup');
   const [user, setUser] = useState<User | null>(null);
 
-  // Persistence mock
   useEffect(() => {
     const saved = localStorage.getItem('sellit_user');
     if (saved) {
@@ -52,30 +52,19 @@ const App: React.FC = () => {
 
     return (
       <div className="flex flex-col md:flex-row h-screen w-full bg-white overflow-hidden">
-        {/* Left side: Carousel Panel */}
         <div className="hidden md:block md:w-1/2 lg:w-[45%] h-full overflow-hidden shrink-0">
           <Carousel />
         </div>
 
-        {/* Right side: Auth Panel with improved scroll handling */}
         <div className="flex-1 h-full overflow-y-auto bg-[#F9FAFB] scrollbar-hide">
           <div className="min-h-full w-full flex flex-col items-center justify-center p-6 md:p-12">
             <div className="w-full max-w-md bg-white md:bg-transparent p-8 md:p-0 rounded-[2.5rem] shadow-xl md:shadow-none my-auto">
-              {step === 'signup' && (
+              {(step === 'signup' || step === 'login' || step === 'forgot_password') && (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                   <AuthForms 
-                    type="signup" 
-                    onSwitch={() => setStep('login')} 
-                    onSubmit={handleSignup} 
-                  />
-                </div>
-              )}
-              {step === 'login' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <AuthForms 
-                    type="login" 
-                    onSwitch={() => setStep('signup')} 
-                    onSubmit={handleLogin} 
+                    type={step === 'forgot_password' ? 'forgot_password' : step as 'signup' | 'login'} 
+                    onSwitch={(newType) => setStep(newType as AuthStep)} 
+                    onSubmit={step === 'signup' ? handleSignup : handleLogin} 
                   />
                 </div>
               )}
@@ -96,6 +85,7 @@ const App: React.FC = () => {
 
   return (
     <ToastProvider>
+      <ConnectivityBanner />
       {content()}
     </ToastProvider>
   );

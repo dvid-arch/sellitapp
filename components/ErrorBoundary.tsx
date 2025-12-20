@@ -1,0 +1,74 @@
+
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
+
+interface Props {
+  children?: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error?: Error;
+}
+
+/**
+ * ErrorBoundary component to catch rendering errors and show a fallback UI.
+ */
+// Use React.Component explicitly to ensure proper type inheritance in class components
+export class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    // Initialize state within the constructor as per React class component standards
+    this.state = {
+      hasError: false
+    };
+  }
+
+  public static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Uncaught error:', error, errorInfo);
+  }
+
+  public render() {
+    // Access state directly from the class instance
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#F8FAFB] flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-[3rem] shadow-2xl p-10 text-center space-y-8 animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-sm">
+              <AlertTriangle size={40} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-black text-gray-900 mb-3">Something snapped.</h1>
+              <p className="text-gray-500 font-medium leading-relaxed">
+                We hit an unexpected error while rendering this part of Sellit. Don't worry, your data is safe.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full bg-sellit text-white py-4 rounded-2xl font-black shadow-lg shadow-sellit/20 flex items-center justify-center gap-3 hover:bg-sellit-dark transition-all"
+              >
+                <RefreshCw size={20} />
+                Refresh Application
+              </button>
+              <button 
+                // Access setState correctly from the Component base class
+                onClick={() => this.setState({ hasError: false })}
+                className="w-full text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-colors"
+              >
+                Try to recover
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Return children from props property of the base class
+    return this.props.children;
+  }
+}

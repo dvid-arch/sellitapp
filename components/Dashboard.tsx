@@ -4,7 +4,7 @@ import {
   Plus, Search, MapPin, Bell, MessageSquare, Home, 
   ChevronDown, Filter, PackageX, LogOut, PanelLeftClose, PanelLeftOpen,
   ArrowUpDown, Radio, UserCircle, Settings, Heart, TrendingUp, Sparkles, Tag,
-  ArrowRight
+  ArrowRight, Bot, ShieldQuestion, Clock, Zap, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { Logo } from '../constants.tsx';
 import { User, Listing, Chat, Offer, ViewRecord } from '../types.ts';
@@ -15,12 +15,54 @@ import { BroadcastsView } from './BroadcastsView.tsx';
 import { ChatView } from './ChatView.tsx';
 import { NotificationsView } from './NotificationsView.tsx';
 import { ProfileView } from './ProfileView.tsx';
+import { AIAssistant } from './AIAssistant.tsx';
 import { useToast } from '../context/ToastContext.tsx';
+import { geminiService } from '../services/gemini.ts';
 
 interface DashboardProps {
   user: User | null;
   onLogout: () => void;
 }
+
+const SUPPORT_CHAT_ID = 'chat_support';
+
+const INITIAL_CHATS: Chat[] = [
+  {
+    id: SUPPORT_CHAT_ID,
+    contactName: 'Sellit Human Desk',
+    contactAvatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150',
+    lastSeen: 'Official Support',
+    lastMessage: 'How can we help you today?',
+    lastMessageTime: 'Today',
+    isSupport: true,
+    supportMeta: {
+      isOnline: true,
+      estimatedWaitMinutes: 3,
+      activeAgentsCount: 4,
+      queuePosition: 0
+    },
+    messages: [
+      { id: 's1', text: 'Hello! This is the human support desk. If you have issues with payments, escrow, or safety, we are here to help.', timestamp: '09:00', senderId: 'them', agentName: 'Official Bot' }
+    ]
+  },
+  {
+    id: 'chat_1',
+    contactName: 'Jane Darwin',
+    contactAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    lastSeen: 'last seen 5 mins ago',
+    lastMessage: 'Yes, it\'s still available.',
+    lastMessageTime: '18:17',
+    product: {
+      title: 'Mini Refrigerator',
+      price: 65000,
+      imageUrl: 'https://images.unsplash.com/photo-1571175452281-04a282879717?w=150'
+    },
+    messages: [
+      { id: 'm1', text: 'Hi! Is this still available?', timestamp: '18:16', senderId: 'me' },
+      { id: 'm2', text: "Yes, it is.", timestamp: '18:17', senderId: 'them' },
+    ]
+  }
+];
 
 const MOCK_LISTINGS: Listing[] = [
   {
@@ -67,26 +109,6 @@ const MOCK_LISTINGS: Listing[] = [
   }
 ];
 
-const INITIAL_CHATS: Chat[] = [
-  {
-    id: 'chat_1',
-    contactName: 'Jane Darwin',
-    contactAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
-    lastSeen: 'last seen 5 mins ago',
-    lastMessage: 'Yes, it\'s still available.',
-    lastMessageTime: '18:17',
-    product: {
-      title: 'Mini Refrigerator',
-      price: 65000,
-      imageUrl: 'https://images.unsplash.com/photo-1571175452281-04a282879717?w=150'
-    },
-    messages: [
-      { id: 'm1', text: 'Hi! Is this still available?', timestamp: '18:16', senderId: 'me' },
-      { id: 'm2', text: "Yes, it is.", timestamp: '18:17', senderId: 'them' },
-    ]
-  }
-];
-
 export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('Home');
   const [listings, setListings] = useState<Listing[]>(MOCK_LISTINGS);
@@ -105,11 +127,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [sortBy, setSortBy] = useState('Newest');
   
-  // Intuitive behavior: Start expanded to show content, then collapse to show it's interactive
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   const { showToast } = useToast();
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -120,36 +143,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const categories = useMemo(() => ['All Categories', 'Electronics', 'Books', 'Fashion', 'Kitchen', 'Home and furniture'], []);
   const sortOptions = useMemo(() => ['Newest', 'Price: Low to High', 'Price: High to Low', 'Urgent First'], []);
 
-  const searchSuggestions = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const query = searchQuery.toLowerCase();
-    const suggestions: { type: 'category' | 'listing'; label: string; extra?: string }[] = [];
-    
-    categories.forEach(cat => {
-      if (cat !== 'All Categories' && cat.toLowerCase().includes(query)) {
-        suggestions.push({ type: 'category', label: cat });
-      }
-    });
+  const recentlyViewedItems = useMemo(() => {
+    return viewHistory
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .map(v => listings.find(l => l.id === v.listingId))
+      .filter((l): l is Listing => !!l)
+      .slice(0, 8);
+  }, [viewHistory, listings]);
 
-    listings.forEach(item => {
-      if (item.title.toLowerCase().includes(query)) {
-        suggestions.push({ type: 'listing', label: item.title, extra: `₦${item.price.toLocaleString()}` });
-      }
-    });
-
-    return suggestions.slice(0, 6);
-  }, [searchQuery, listings, categories]);
+  const loadData = useCallback(() => {
+    setIsLoading(true);
+    setLoadError(false);
+    // Simulate real network request
+    setTimeout(() => {
+        // Mock occasional failure to test resilience
+        if (Math.random() < 0.05) {
+            setLoadError(true);
+            setIsLoading(false);
+            showToast('Sync Error', 'Could not refresh campus feed. Check your connection.', 'error');
+        } else {
+            setIsLoading(false);
+        }
+    }, 800);
+  }, [showToast]);
 
   useEffect(() => {
-    // Show expanded sidebar for 1.5s then collapse to teach interactivity
     const sidebarTimer = setTimeout(() => setIsSidebarExpanded(false), 1500);
-    const loaderTimer = setTimeout(() => setIsLoading(false), 800);
-    
-    return () => {
-      clearTimeout(sidebarTimer);
-      clearTimeout(loaderTimer);
-    };
-  }, []);
+    loadData();
+    return () => clearTimeout(sidebarTimer);
+  }, [loadData]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -186,8 +208,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setSelectedListing(listing);
     setViewHistory(prev => {
       const exists = prev.find(v => v.listingId === listing.id);
-      if (exists) return prev;
-      return [...prev, { listingId: listing.id, lastViewedPrice: listing.price, timestamp: Date.now() }];
+      if (exists) {
+        return prev.map(v => v.listingId === listing.id ? { ...v, timestamp: Date.now() } : v);
+      }
+      return [{ listingId: listing.id, lastViewedPrice: listing.price, timestamp: Date.now() }, ...prev];
     });
   };
 
@@ -195,8 +219,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setSavedItems(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const startChat = useCallback((contactName: string, avatar: string, product: { title: string, price: number, imageUrl: string }) => {
-    const existingChat = chats.find(c => c.contactName === contactName && c.product.title === product.title);
+  const startChat = useCallback((contactName: string, avatar: string, product?: { title: string, price: number, imageUrl: string }) => {
+    const existingChat = chats.find(c => c.contactName === contactName && c.product?.title === product?.title);
     if (existingChat) {
       setActiveChatId(existingChat.id);
     } else {
@@ -215,6 +239,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
     setActiveTab('Messages');
   }, [chats]);
+
+  const handleSwitchToSupport = () => {
+    setIsAssistantOpen(false);
+    setActiveChatId(SUPPORT_CHAT_ID);
+    setActiveTab('Messages');
+    
+    setChats(prev => prev.map(c => 
+      c.id === SUPPORT_CHAT_ID 
+      ? { ...c, supportMeta: { ...c.supportMeta!, queuePosition: 2, estimatedWaitMinutes: 3 } } 
+      : c
+    ));
+
+    showToast('Connecting to Support', 'A human agent will be with you in ~3 mins.', 'info');
+  };
 
   const handleMakeOffer = (amount: number, message: string) => {
     if (!selectedListing) return;
@@ -245,6 +283,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     showToast('Success', 'Item marked as sold and moved to history.', 'success');
   };
 
+  const handleCommitToBuy = (amount: number) => {
+    if (!selectedListing) return;
+    setListings(prev => prev.map(l => l.id === selectedListing.id ? { ...l, status: 'committed' } : l));
+    setSelectedListing(prev => prev && prev.id === selectedListing.id ? { ...prev, status: 'committed' } : prev);
+  };
+
+  const handleBoostListing = (listingId: string) => {
+    setListings(prev => prev.map(l => l.id === listingId ? { ...l, isBoosted: true } : l));
+    showToast('Success', 'Your ad is now pinned to the top!', 'success');
+  };
+
   const handleDeleteListing = (listingId: string) => {
     setListings(prev => prev.filter(l => l.id !== listingId));
     showToast('Deleted', 'Listing removed successfully.', 'info');
@@ -255,7 +304,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setEditingListing(null);
   };
 
-  const handleSelectSuggestion = (suggestion: any) => {
+  const handleSelectSuggestion = async (suggestion: any) => {
+    if (suggestion.type === 'ai') {
+      setIsAssistantOpen(true);
+      setShowSearchSuggestions(false);
+      return;
+    }
+    
     setSearchQuery(suggestion.label);
     setShowSearchSuggestions(false);
     setSelectedListing(null);
@@ -269,6 +324,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   };
 
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    
+    const suggestions: { label: string; type: 'category' | 'listing' | 'ai' | 'trending'; extra?: string }[] = [];
+    
+    suggestions.push({ 
+      label: `Ask AI about "${searchQuery}"`, 
+      type: 'ai' 
+    });
+
+    categories.filter(c => c !== 'All Categories' && c.toLowerCase().includes(searchQuery.toLowerCase()))
+      .forEach(c => suggestions.push({ label: c, type: 'category' }));
+
+    listings.filter(l => l.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      .slice(0, 3)
+      .forEach(l => suggestions.push({ 
+        label: l.title, 
+        type: 'listing', 
+        extra: `₦${l.price.toLocaleString()}` 
+      }));
+
+    return suggestions;
+  }, [searchQuery, listings, categories]);
+
   const filteredListings = useMemo(() => {
     let result = listings.filter(item => {
       const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -280,6 +359,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     if (sortBy === 'Price: Low to High') result.sort((a, b) => a.price - b.price);
     else if (sortBy === 'Price: High to Low') result.sort((a, b) => b.price - a.price);
     else if (sortBy === 'Urgent First') result.sort((a, b) => (b.isUrgent ? 1 : 0) - (a.isUrgent ? 1 : 0));
+
+    if (sortBy === 'Newest') {
+        result.sort((a, b) => (b.isBoosted ? 1 : 0) - (a.isBoosted ? 1 : 0));
+    }
 
     return result;
   }, [listings, searchQuery, selectedCategory, sortBy]);
@@ -311,9 +394,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         return <ProfileView 
           user={user} 
           listings={listings.filter(l => l.seller === (user?.name || 'Obokobong'))} 
+          offers={allOffers}
           onEditListing={(l) => { setEditingListing(l); }}
           onDeleteListing={handleDeleteListing}
           onMarkSold={handleMarkSold}
+          onBoostListing={handleBoostListing}
           onAddProductClick={() => setActiveTab('Add Product')}
           onOpenListing={handleOpenProduct}
         />;
@@ -331,6 +416,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </div>
               </div>
             </div>
+
+            {recentlyViewedItems.length > 0 && (
+              <div className="mb-10 animate-in fade-in slide-in-from-left duration-500">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Clock size={14} className="text-sellit" /> Recently Viewed
+                  </h3>
+                  <button onClick={() => setViewHistory([])} className="text-[10px] font-black text-gray-300 hover:text-red-400 uppercase tracking-widest transition-colors">Clear</button>
+                </div>
+                <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2">
+                  {recentlyViewedItems.map(item => (
+                    <div key={item.id} onClick={() => handleOpenProduct(item)} className="shrink-0 group cursor-pointer w-24 md:w-32">
+                      <div className="aspect-square rounded-2xl overflow-hidden mb-2 border border-gray-100 group-hover:border-sellit transition-colors relative">
+                        <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
+                        {item.status === 'sold' && <div className="absolute inset-0 bg-white/60 flex items-center justify-center font-black text-[10px] text-gray-500 uppercase">Sold</div>}
+                      </div>
+                      <p className="text-[10px] md:text-xs font-black text-gray-900 truncate">{item.title}</p>
+                      <p className="text-[10px] font-black text-sellit">₦{item.price.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div ref={productGridRef} className={`sticky top-[-1px] z-30 transition-all duration-300 py-4 -mx-4 md:-mx-8 px-4 md:px-8 bg-[#F8FAFB]/95 backdrop-blur-md mb-6 md:mb-10 ${isScrolled ? 'border-b border-gray-100 shadow-sm' : ''}`}>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -379,29 +487,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                     <div className="h-4 bg-gray-50 rounded w-1/2" />
                   </div>
                 ))
+              ) : loadError ? (
+                <div className="col-span-full py-24 md:py-40 flex flex-col items-center justify-center text-center">
+                  <div className="w-20 h-20 bg-red-50 text-red-500 rounded-[2rem] flex items-center justify-center mb-8">
+                    <AlertCircle size={40} />
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">Failed to load feed</h2>
+                  <p className="text-gray-400 font-medium max-w-sm px-4 mb-8">A technical hitch occurred while talking to our campus server.</p>
+                  <button onClick={loadData} className="px-8 py-3 bg-sellit text-white rounded-xl font-black flex items-center gap-3">
+                    <RefreshCw size={18} /> Retry Sync
+                  </button>
+                </div>
               ) : filteredListings.length > 0 ? (
                 filteredListings.map((item) => {
                   const isSaved = savedItems.includes(item.id);
-                  const prevView = viewHistory.find(v => v.listingId === item.id);
-                  const isPriceDropped = prevView && prevView.lastViewedPrice > item.price;
                   const isOwner = item.seller === (user?.name || 'Obokobong');
 
                   return (
                     <div 
                       key={item.id} 
                       onClick={() => handleOpenProduct(item)} 
-                      className={`group bg-white rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border border-gray-100 hover:shadow-2xl hover:shadow-sellit/5 transition-all duration-500 cursor-pointer relative ${item.status === 'sold' ? 'opacity-70' : ''}`}
+                      className={`group bg-white rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border border-gray-100 hover:shadow-2xl hover:shadow-sellit/5 transition-all duration-500 cursor-pointer relative ${item.status !== 'available' ? 'opacity-70' : ''}`}
                     >
                       <div className="relative aspect-square md:aspect-[4/5] overflow-hidden bg-gray-50">
                         <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.title} />
                         <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+                          {item.isBoosted && (
+                            <div className="bg-sellit text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg flex items-center gap-1">
+                                <Zap size={10} fill="white" /> Priority
+                            </div>
+                          )}
                           {item.status === 'sold' ? (
                             <div className="bg-gray-900 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">Sold</div>
+                          ) : item.status === 'committed' ? (
+                            <div className="bg-blue-600 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg">Committed</div>
                           ) : item.isUrgent && (
                             <div className="bg-orange-500 text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider shadow-lg animate-pulse">Urgent</div>
                           )}
                         </div>
-                        {!isOwner && (
+                        {!isOwner && item.status === 'available' && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); toggleSave(item.id); }}
                             className={`absolute top-3 left-3 p-2 rounded-xl transition-all z-10 ${isSaved ? 'bg-sellit text-white shadow-lg' : 'bg-white/80 text-gray-400 hover:text-sellit'}`}
@@ -416,13 +540,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                         <p className="text-[10px] md:text-xs text-gray-400 font-bold mt-1 md:mt-2 line-clamp-1">{item.description}</p>
                         <div className="flex items-center justify-between mt-3 md:mt-5 pt-3 border-t border-gray-50">
                           <div className="flex items-center gap-2">
-                             <span className={`text-sm md:text-xl font-black ${item.status === 'sold' ? 'text-gray-400' : 'text-gray-900'}`}>₦{item.price.toLocaleString()}</span>
-                             {isPriceDropped && item.status !== 'sold' && <span className="text-[10px] line-through text-gray-300">₦{prevView.lastViewedPrice.toLocaleString()}</span>}
+                             <span className={`text-sm md:text-xl font-black ${item.status !== 'available' ? 'text-gray-400' : 'text-gray-900'}`}>₦{item.price.toLocaleString()}</span>
                           </div>
                           {isOwner ? (
                              <span className="text-[8px] md:text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md uppercase border border-gray-100">Mine</span>
                           ) : (
-                            item.isNegotiable && item.status !== 'sold' && <span className="text-[8px] md:text-[10px] font-black text-sellit bg-sellit/10 px-2 py-0.5 rounded-md uppercase">Negotiable</span>
+                            item.isNegotiable && item.status === 'available' && <span className="text-[8px] md:text-[10px] font-black text-sellit bg-sellit/10 px-2 py-0.5 rounded-md uppercase">Negotiable</span>
                           )}
                         </div>
                       </div>
@@ -431,7 +554,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 })
               ) : (
                 <div className="col-span-full py-24 md:py-40 flex flex-col items-center justify-center text-center">
-                  <div className="w-20 h-20 bg-gray-50 rounded-[2rem] flex items-center justify-center text-gray-200 mb-8 border border-dashed border-gray-200">
+                  <div className="w-20 h-20 bg-gray-50 rounded-[2rem] flex items-center justify-center text-gray-300 mb-8 border border-dashed border-gray-200">
                     <PackageX size={40} />
                   </div>
                   <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">No items found</h2>
@@ -447,7 +570,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const currentOffer = selectedListing ? allOffers.find(o => o.listingId === selectedListing.id && o.buyerName === (user?.name || 'Obokobong')) : undefined;
   const receivedOffers = selectedListing ? allOffers.filter(o => o.listingId === selectedListing.id && o.buyerName !== (user?.name || 'Obokobong')) : [];
   const isSelectedOwner = selectedListing ? selectedListing.seller === (user?.name || 'Obokobong') : false;
-  const existingChat = selectedListing ? chats.find(c => c.contactName === selectedListing.seller && c.product.title === selectedListing.title) : undefined;
+  const existingChat = selectedListing ? chats.find(c => c.contactName === selectedListing.seller && c.product?.title === selectedListing.title) : undefined;
   const lastViewedPrice = selectedListing ? viewHistory.find(v => v.listingId === selectedListing.id)?.lastViewedPrice : undefined;
 
   return (
@@ -513,7 +636,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-10 shrink-0 z-50">
           <div className="flex-1 max-w-2xl relative" ref={searchRef}>
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors duration-300 ${showSearchSuggestions ? 'text-sellit' : 'text-gray-400'}`} size={18} />
-            <input type="text" placeholder="Search anything on campus..." value={searchQuery} onFocus={() => setShowSearchSuggestions(true)} onChange={(e) => { setSearchQuery(e.target.value); setShowSearchSuggestions(true); }} onKeyDown={(e) => { if (e.key === 'Enter') { setShowSearchSuggestions(false); setSelectedListing(null); if (activeTab !== 'Home' || showBroadcastForm) { setActiveTab('Home'); setShowBroadcastForm(false); } setTimeout(scrollToGrid, 100); } }} className="w-full pl-12 pr-4 py-2.5 md:py-3.5 bg-gray-50 border-none rounded-2xl text-sm md:text-base outline-none focus:ring-4 focus:ring-sellit/5 transition-all font-bold text-gray-900 placeholder:text-gray-400 shadow-inner" />
+            <input type="text" placeholder="Search anything on campus..." value={searchQuery} onFocus={() => setShowSearchSuggestions(true)} onChange={(e) => { setSearchQuery(e.target.value); setShowSearchSuggestions(true); }} onKeyDown={async (e) => { if (e.key === 'Enter') { setShowSearchSuggestions(false); setSelectedListing(null); if (activeTab !== 'Home' || showBroadcastForm) { setActiveTab('Home'); setShowBroadcastForm(false); } setTimeout(scrollToGrid, 100); const interpreted = await geminiService.interpretSearch(searchQuery); if (interpreted.category) setSelectedCategory(interpreted.category); } }} className="w-full pl-12 pr-4 py-2.5 md:py-3.5 bg-gray-50 border-none rounded-2xl text-sm md:text-base outline-none focus:ring-4 focus:ring-sellit/5 transition-all font-bold text-gray-900 placeholder:text-gray-400 shadow-inner" />
             {showSearchSuggestions && searchSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-3 bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-200 ring-1 ring-black/5">
                 <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
@@ -524,7 +647,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   {searchSuggestions.map((suggestion, idx) => (
                     <button key={`${suggestion.type}-${idx}`} onClick={() => handleSelectSuggestion(suggestion)} className="w-full flex items-center justify-between px-6 py-4 hover:bg-sellit/5 transition-colors group border-b border-gray-50 last:border-0">
                       <div className="flex items-center gap-4 text-left">
-                        <div className={`p-2.5 rounded-xl ${suggestion.type === 'category' ? 'bg-sellit/10 text-sellit' : suggestion.type === 'listing' ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-500'}`}>{suggestion.type === 'category' ? <Tag size={16} /> : suggestion.type === 'listing' ? <PackageX size={16} /> : <TrendingUp size={16} />}</div>
+                        <div className={`p-2.5 rounded-xl ${suggestion.type === 'category' ? 'bg-sellit/10 text-sellit' : suggestion.type === 'listing' ? 'bg-orange-50 text-orange-500' : suggestion.type === 'ai' ? 'bg-purple-50 text-purple-600' : 'bg-green-50 text-green-500'}`}>
+                          {suggestion.type === 'category' ? <Tag size={16} /> : suggestion.type === 'listing' ? <PackageX size={16} /> : suggestion.type === 'ai' ? <Bot size={16} /> : <TrendingUp size={16} />}
+                        </div>
                         <div><p className="text-sm font-bold text-gray-900 group-hover:text-sellit transition-colors">{suggestion.label}</p><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{suggestion.type}</p></div>
                       </div>
                       <div className="flex items-center gap-2">{suggestion.extra && <span className="text-xs font-black text-sellit bg-sellit/5 px-3 py-1 rounded-lg border border-sellit/10">{suggestion.extra}</span>}<ArrowRight size={14} className="text-gray-200 group-hover:text-sellit group-hover:translate-x-1 transition-all" /></div>
@@ -553,10 +678,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </header>
         <main ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-hide relative bg-[#F8FAFB] scroll-smooth">{renderContent()}</main>
+        
+        {!isAssistantOpen && (
+          <button 
+            onClick={() => setIsAssistantOpen(true)}
+            className="fixed bottom-24 right-6 md:bottom-10 md:right-10 z-[100] bg-sellit text-white w-14 h-14 md:w-16 md:h-16 rounded-[1.75rem] shadow-2xl shadow-sellit/40 flex items-center justify-center hover:scale-110 active:scale-90 transition-all group"
+          >
+            <Sparkles size={28} className="group-hover:rotate-12 transition-transform" />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full" />
+          </button>
+        )}
+
+        <AIAssistant isOpen={isAssistantOpen} onClose={() => setIsAssistantOpen(false)} onSwitchToSupport={handleSwitchToSupport} />
       </div>
       {selectedListing && (
         <ProductDetail 
-          listing={selectedListing} userOffer={currentOffer} receivedOffers={receivedOffers} existingChat={existingChat} lastViewedPrice={lastViewedPrice} isOwner={isSelectedOwner} isSaved={savedItems.includes(selectedListing.id)} onClose={() => setSelectedListing(null)} onContact={() => { startChat(selectedListing.seller, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', { title: selectedListing.title, price: selectedListing.price, imageUrl: selectedListing.imageUrl }); setSelectedListing(null); }} onMakeOffer={handleMakeOffer} onWithdrawOffer={handleWithdrawOffer} onToggleSave={toggleSave} onMarkSold={handleMarkSold} onEdit={() => { setEditingListing(selectedListing); setSelectedListing(null); }} onDelete={() => { handleDeleteListing(selectedListing.id); setSelectedListing(null); }}
+          listing={selectedListing} userOffer={currentOffer} receivedOffers={receivedOffers} existingChat={existingChat} lastViewedPrice={lastViewedPrice} isOwner={isSelectedOwner} isSaved={savedItems.includes(selectedListing.id)} onClose={() => setSelectedListing(null)} onContact={() => { startChat(selectedListing.seller, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', { title: selectedListing.title, price: selectedListing.price, imageUrl: selectedListing.imageUrl }); setSelectedListing(null); }} onMakeOffer={handleMakeOffer} onWithdrawOffer={handleWithdrawOffer} onToggleSave={toggleSave} onMarkSold={handleMarkSold} onEdit={() => { setEditingListing(selectedListing); setSelectedListing(null); }} onDelete={() => { handleDeleteListing(selectedListing.id); setSelectedListing(null); }} onCommitToBuy={handleCommitToBuy}
         />
       )}
     </div>
